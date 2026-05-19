@@ -15,6 +15,7 @@ import aiNewRoutes from './routes/aiNew.js';
 import notificationRoutes from './routes/notifications.js';
 import { createCrudRoutes } from './routes/crud.js';
 import { authenticateToken } from './middleware/auth.js';
+import customViewsRoutes from './routes/customViews.js';
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 4000;
@@ -157,29 +158,28 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-none-all-ai-functions-are-covered-highest-ai-density', require('./routes/gap_none_all_ai_functions_are_covered_highest_ai_density'));
+// // === Batch 02 Gaps & Frontend Mounts (disabled: CJS require() incompatible with ESM module) ===
+// app.use('/api/gap-none-all-ai-functions-are-covered-highest-ai-density', require('./routes/gap_none_all_ai_functions_are_covered_highest_ai_density'));
+// app.use('/api/gap-no-detailed-case-detail-schema-materials-dentist-contact-pat', require('./routes/gap_no_detailed_case_detail_schema_materials_dentist_contact_pat'));
+// app.use('/api/gap-no-workflow-stage-tracking-received-in-progress-completed-de', require('./routes/gap_no_workflow_stage_tracking_received_in_progress_completed_de'));
+// app.use('/api/gap-no-quality-metric-or-defect-tracker', require('./routes/gap_no_quality_metric_or_defect_tracker'));
+// app.use('/api/gap-no-dentist-customer-communication-template-library', require('./routes/gap_no_dentist_customer_communication_template_library'));
+// app.use('/api/gap-no-inventory-management-for-materials', require('./routes/gap_no_inventory_management_for_materials'));
+// app.use('/api/gap-no-webhooks', require('./routes/gap_no_webhooks'));
+// app.use('/api/gap-no-reporting-beyond-stubs', require('./routes/gap_no_reporting_beyond_stubs'));
 
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-detailed-case-detail-schema-materials-dentist-contact-pat', require('./routes/gap_no_detailed_case_detail_schema_materials_dentist_contact_pat'));
+// === Custom Views (Lab Views) - mounted BEFORE 404 handler ===
+app.use('/api/custom-views', customViewsRoutes);
 
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-workflow-stage-tracking-received-in-progress-completed-de', require('./routes/gap_no_workflow_stage_tracking_received_in_progress_completed_de'));
+// Health endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'dental-lab-api', time: new Date().toISOString() });
+});
 
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-quality-metric-or-defect-tracker', require('./routes/gap_no_quality_metric_or_defect_tracker'));
-
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-dentist-customer-communication-template-library', require('./routes/gap_no_dentist_customer_communication_template_library'));
-
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-inventory-management-for-materials', require('./routes/gap_no_inventory_management_for_materials'));
-
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-webhooks', require('./routes/gap_no_webhooks'));
-
-// // === Batch 02 Gaps & Frontend Mounts ===
-app.use('/api/gap-no-reporting-beyond-stubs', require('./routes/gap_no_reporting_beyond_stubs'));
+// 404 catch-all (after all routes)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not found', path: req.originalUrl });
+});
 
 app.listen(PORT, () => {
   console.log(`🦷 Dental Lab API running on port ${PORT}`);

@@ -14,6 +14,7 @@ import GapNoDentistCustomerCommunicationTemplateLibrary from './pages/GapNoDenti
 import GapNoInventoryManagementForMaterials from './pages/GapNoInventoryManagementForMaterials';
 import GapNoWebhooks from './pages/GapNoWebhooks';
 import GapNoReportingBeyondStubs from './pages/GapNoReportingBeyondStubs';
+import CustomViewsPage from './pages/CustomViewsPage';
 
 // ============================================================
 // DentalLab AI - Case Manager SPA
@@ -60,6 +61,23 @@ function App() {
         });
     }
   }, [token, api]);
+
+  // ---- Simple hash/path -> page routing (supports /custom-views and #/custom-views) ----
+  useEffect(() => {
+    const applyRoute = () => {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '');
+      const path = (window.location.pathname || '').replace(/^\/+/, '');
+      const target = hash || path;
+      if (target === 'custom-views') setCurrentPage('custom-views');
+    };
+    applyRoute();
+    window.addEventListener('hashchange', applyRoute);
+    window.addEventListener('popstate', applyRoute);
+    return () => {
+      window.removeEventListener('hashchange', applyRoute);
+      window.removeEventListener('popstate', applyRoute);
+    };
+  }, []);
 
   // ---- Logout ----
   const handleLogout = () => {
@@ -255,6 +273,12 @@ const NAV_SECTIONS = [
       { key: 'ai-tools', label: 'AI Tools', icon: 'fa-robot' },
       { key: 'notifications', label: 'Notifications', icon: 'fa-bell' },
     ]
+  },
+  {
+    title: 'INSIGHTS',
+    items: [
+      { key: 'custom-views', label: 'Lab Views', icon: 'fa-chart-bar' },
+    ]
   }
 ];
 
@@ -359,6 +383,8 @@ function MainContent({ currentPage, setCurrentPage, token, api, addToast, user }
       return <AIToolsPage api={api} addToast={addToast} />;
     case 'notifications':
       return <NotificationsPage api={api} addToast={addToast} />;
+    case 'custom-views':
+      return <CustomViewsPage api={api} addToast={addToast} />;
     default:
       return <DashboardPage api={api} addToast={addToast} setCurrentPage={setCurrentPage} user={user} />;
   }
