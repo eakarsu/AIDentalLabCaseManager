@@ -1,7 +1,17 @@
 import { Router } from 'express';
 import pool from '../db.js';
+import { aiRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
+
+// Ensure complexity_score column exists on cases table
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE cases ADD COLUMN IF NOT EXISTS complexity_score NUMERIC(4,1)`);
+  } catch (e) {
+    // column may already exist or ALTER TABLE not supported — safe to ignore
+  }
+})();
 
 async function callOpenRouter(messages, systemPrompt) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -13,7 +23,7 @@ async function callOpenRouter(messages, systemPrompt) {
       'X-Title': 'AI Dental Lab Case Manager'
     },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5',
+      model: 'anthropic/claude-3-5-sonnet-20241022',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages
@@ -28,7 +38,7 @@ async function callOpenRouter(messages, systemPrompt) {
 }
 
 // AI: Case Complexity Scoring & Turnaround Estimation
-router.post('/complexity-score', async (req, res) => {
+router.post('/complexity-score', aiRateLimiter, async (req, res) => {
   try {
     const { caseId } = req.body;
     let caseData;
@@ -56,20 +66,37 @@ Format your response as structured sections with clear headers. Be specific and 
       { role: 'user', content: `Analyze this dental lab case:\n${JSON.stringify(caseData, null, 2)}` }
     ], systemPrompt);
 
+    // Parse complexity score from AI response and write back to cases table
+    let parsedScore = null;
+    const scoreMatch = result.match(/\b([1-9]|10)\s*(?:\/\s*10|out of 10)|\bscore[:\s]+([1-9]|10)\b/i)
+      || result.match(/complexity[^\d]*([1-9]|10)\b/i)
+      || result.match(/\b([1-9]|10)\s*[-–]\s*(?:simple|low|moderate|high|extremely)/i);
+    if (scoreMatch) {
+      parsedScore = parseFloat(scoreMatch[1] || scoreMatch[2]);
+    } else {
+      // fallback: find first standalone 1-10 number near "complexity"
+      const fallback = result.match(/(?:complexity|score)[^.\n]{0,30}?(\b[1-9]|10\b)/i);
+      if (fallback) parsedScore = parseFloat(fallback[1]);
+    }
+
+    if (parsedScore !== null && caseId) {
+      await pool.query('UPDATE cases SET complexity_score = $1 WHERE id = $2', [parsedScore, caseId]);
+    }
+
     // Save to ai_results
     await pool.query(
       'INSERT INTO ai_results (case_id, ai_type, input_data, result, model_used) VALUES ($1, $2, $3, $4, $5)',
-      [caseId || null, 'complexity_score', JSON.stringify(caseData), result, process.env.OPENROUTER_MODEL]
+      [caseId || null, 'complexity_score', JSON.stringify(caseData), result, 'anthropic/claude-3-5-sonnet-20241022']
     );
 
-    res.json({ result, caseData });
+    res.json({ result, caseData, parsedComplexityScore: parsedScore });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // AI: Material Recommendation
-router.post('/material-recommendation', async (req, res) => {
+router.post('/material-recommendation', aiRateLimiter, async (req, res) => {
   try {
     const { caseId } = req.body;
     let caseData;
@@ -102,7 +129,7 @@ Consider factors like: tooth location, restoration type, occlusal forces, esthet
 
     await pool.query(
       'INSERT INTO ai_results (case_id, ai_type, input_data, result, model_used) VALUES ($1, $2, $3, $4, $5)',
-      [caseId || null, 'material_recommendation', JSON.stringify(caseData), result, process.env.OPENROUTER_MODEL]
+      [caseId || null, 'material_recommendation', JSON.stringify(caseData), result, 'anthropic/claude-3-5-sonnet-20241022']
     );
 
     res.json({ result, caseData });
@@ -112,7 +139,7 @@ Consider factors like: tooth location, restoration type, occlusal forces, esthet
 });
 
 // AI: Quality Issue Root Cause Analysis
-router.post('/root-cause-analysis', async (req, res) => {
+router.post('/root-cause-analysis', aiRateLimiter, async (req, res) => {
   try {
     const { remakeId } = req.body;
     let remakeData;
@@ -146,7 +173,7 @@ Use the 5 Whys methodology and fishbone diagram thinking. Be thorough and action
 
     await pool.query(
       'INSERT INTO ai_results (case_id, ai_type, input_data, result, model_used) VALUES ($1, $2, $3, $4, $5)',
-      [remakeData?.case_id || null, 'root_cause_analysis', JSON.stringify(remakeData), result, process.env.OPENROUTER_MODEL]
+      [remakeData?.case_id || null, 'root_cause_analysis', JSON.stringify(remakeData), result, 'anthropic/claude-3-5-sonnet-20241022']
     );
 
     res.json({ result, remakeData });
@@ -156,7 +183,7 @@ Use the 5 Whys methodology and fishbone diagram thinking. Be thorough and action
 });
 
 // AI: Lab-to-Dentist Communication Drafting
-router.post('/draft-communication', async (req, res) => {
+router.post('/draft-communication', aiRateLimiter, async (req, res) => {
   try {
     const { caseId, communicationType, context } = req.body;
     let caseData = null;
@@ -192,7 +219,7 @@ Format the communication as a ready-to-send email with subject line and body.`;
 
     await pool.query(
       'INSERT INTO ai_results (case_id, ai_type, input_data, result, model_used) VALUES ($1, $2, $3, $4, $5)',
-      [caseId || null, 'draft_communication', JSON.stringify({ communicationType, context, caseData }), result, process.env.OPENROUTER_MODEL]
+      [caseId || null, 'draft_communication', JSON.stringify({ communicationType, context, caseData }), result, 'anthropic/claude-3-5-sonnet-20241022']
     );
 
     res.json({ result, caseData, communicationType });
@@ -202,7 +229,7 @@ Format the communication as a ready-to-send email with subject line and body.`;
 });
 
 // AI: Production Bottleneck Prediction
-router.post('/bottleneck-prediction', async (req, res) => {
+router.post('/bottleneck-prediction', aiRateLimiter, async (req, res) => {
   try {
     const schedules = await pool.query(`
       SELECT ps.*, c.case_number, c.due_date, c.priority, t.name as technician_name, t.current_workload, t.max_workload
@@ -235,7 +262,7 @@ Consider: technician workloads, machine availability, oven cycle times, dependen
 
     await pool.query(
       'INSERT INTO ai_results (case_id, ai_type, input_data, result, model_used) VALUES ($1, $2, $3, $4, $5)',
-      [null, 'bottleneck_prediction', 'production_pipeline_analysis', result, process.env.OPENROUTER_MODEL]
+      [null, 'bottleneck_prediction', 'production_pipeline_analysis', result, 'anthropic/claude-3-5-sonnet-20241022']
     );
 
     res.json({ result });

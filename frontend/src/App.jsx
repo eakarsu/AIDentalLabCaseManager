@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+// // === Batch 02 Gaps & Frontend Mounts ===
+import CfPredictiveTurnaroundTime from './pages/CfPredictiveTurnaroundTime';
+import CfDefectPrevention from './pages/CfDefectPrevention';
+import CfTechnicianSkillMatching from './pages/CfTechnicianSkillMatching';
+import CfQualityScoring from './pages/CfQualityScoring';
+import CfSupplyChainOptimization from './pages/CfSupplyChainOptimization';
+import GapNoneAllAiFunctionsAreCoveredHighestAiDensity from './pages/GapNoneAllAiFunctionsAreCoveredHighestAiDensity';
+import GapNoDetailedCaseDetailSchemaMaterialsDentistContactPat from './pages/GapNoDetailedCaseDetailSchemaMaterialsDentistContactPat';
+import GapNoWorkflowStageTrackingReceivedInProgressCompletedDe from './pages/GapNoWorkflowStageTrackingReceivedInProgressCompletedDe';
+import GapNoQualityMetricOrDefectTracker from './pages/GapNoQualityMetricOrDefectTracker';
+import GapNoDentistCustomerCommunicationTemplateLibrary from './pages/GapNoDentistCustomerCommunicationTemplateLibrary';
+import GapNoInventoryManagementForMaterials from './pages/GapNoInventoryManagementForMaterials';
+import GapNoWebhooks from './pages/GapNoWebhooks';
+import GapNoReportingBeyondStubs from './pages/GapNoReportingBeyondStubs';
+import CustomViewsPage from './pages/CustomViewsPage';
+
 // ============================================================
 // DentalLab AI - Case Manager SPA
 // ============================================================
@@ -45,6 +61,23 @@ function App() {
         });
     }
   }, [token, api]);
+
+  // ---- Simple hash/path -> page routing (supports /custom-views and #/custom-views) ----
+  useEffect(() => {
+    const applyRoute = () => {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '');
+      const path = (window.location.pathname || '').replace(/^\/+/, '');
+      const target = hash || path;
+      if (target === 'custom-views') setCurrentPage('custom-views');
+    };
+    applyRoute();
+    window.addEventListener('hashchange', applyRoute);
+    window.addEventListener('popstate', applyRoute);
+    return () => {
+      window.removeEventListener('hashchange', applyRoute);
+      window.removeEventListener('popstate', applyRoute);
+    };
+  }, []);
 
   // ---- Logout ----
   const handleLogout = () => {
@@ -238,6 +271,13 @@ const NAV_SECTIONS = [
     title: 'AI ASSISTANT',
     items: [
       { key: 'ai-tools', label: 'AI Tools', icon: 'fa-robot' },
+      { key: 'notifications', label: 'Notifications', icon: 'fa-bell' },
+    ]
+  },
+  {
+    title: 'INSIGHTS',
+    items: [
+      { key: 'custom-views', label: 'Lab Views', icon: 'fa-chart-bar' },
     ]
   }
 ];
@@ -341,6 +381,10 @@ function MainContent({ currentPage, setCurrentPage, token, api, addToast, user }
       return <DataPage title="Shipments" apiEndpoint="/api/shipments" columns={SHIPMENTS_COLUMNS} formFields={SHIPMENTS_FIELDS} token={token} api={api} addToast={addToast} />;
     case 'ai-tools':
       return <AIToolsPage api={api} addToast={addToast} />;
+    case 'notifications':
+      return <NotificationsPage api={api} addToast={addToast} />;
+    case 'custom-views':
+      return <CustomViewsPage api={api} addToast={addToast} />;
     default:
       return <DashboardPage api={api} addToast={addToast} setCurrentPage={setCurrentPage} user={user} />;
   }
@@ -830,10 +874,57 @@ function AIToolsPage({ api, addToast }) {
   const [bottleneckResult, setBottleneckResult] = useState('');
   const [bottleneckLoading, setBottleneckLoading] = useState(false);
 
+  // New AI tools
+  const [qaResult, setQaResult] = useState(null);
+  const [qaLoading, setQaLoading] = useState(false);
+
+  const [kanbanResult, setKanbanResult] = useState(null);
+  const [kanbanLoading, setKanbanLoading] = useState(false);
+
+  const [orderResult, setOrderResult] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+
+  // New: predict-turnaround-time
+  const [turnaroundCase, setTurnaroundCase] = useState('');
+  const [turnaroundResult, setTurnaroundResult] = useState(null);
+  const [turnaroundLoading, setTurnaroundLoading] = useState(false);
+
+  // New: technician-skill-match
+  const [skillCase, setSkillCase] = useState('');
+  const [skillResult, setSkillResult] = useState(null);
+  const [skillLoading, setSkillLoading] = useState(false);
+
   useEffect(() => {
     api('/api/cases').then(r => setCases(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
     api('/api/remakes').then(r => setRemakes(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
   }, [api]);
+
+  const runQualityAnalytics = async () => {
+    setQaLoading(true); setQaResult(null);
+    try {
+      const res = await api('/api/ai/quality-analytics', { method: 'POST', body: JSON.stringify({}) });
+      setQaResult(res);
+    } catch (err) { addToast('Quality analytics failed: ' + err.message, 'error'); }
+    finally { setQaLoading(false); }
+  };
+
+  const runKanban = async () => {
+    setKanbanLoading(true); setKanbanResult(null);
+    try {
+      const res = await api('/api/ai/case-kanban', { method: 'POST', body: JSON.stringify({}) });
+      setKanbanResult(res);
+    } catch (err) { addToast('Kanban analysis failed: ' + err.message, 'error'); }
+    finally { setKanbanLoading(false); }
+  };
+
+  const runOrderAdvisor = async () => {
+    setOrderLoading(true); setOrderResult(null);
+    try {
+      const res = await api('/api/ai/material-order-advisor', { method: 'POST', body: JSON.stringify({}) });
+      setOrderResult(res);
+    } catch (err) { addToast('Order advisor failed: ' + err.message, 'error'); }
+    finally { setOrderLoading(false); }
+  };
 
   const analyzeComplexity = async () => {
     if (!complexityCase) { addToast('Please select a case', 'error'); return; }
@@ -890,6 +981,40 @@ function AIToolsPage({ api, addToast }) {
       setBottleneckResult(res.result || JSON.stringify(res));
     } catch (err) { addToast('Analysis failed: ' + err.message, 'error'); }
     finally { setBottleneckLoading(false); }
+  };
+
+  const runTurnaround = async () => {
+    if (!turnaroundCase) { addToast('Please select a case', 'error'); return; }
+    setTurnaroundLoading(true); setTurnaroundResult(null);
+    try {
+      const res = await api('/api/ai/predict-turnaround-time', { method: 'POST', body: JSON.stringify({ caseId: turnaroundCase }) });
+      setTurnaroundResult(res);
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('openrouter') || msg.includes('503') || msg.toLowerCase().includes('unavailable')) {
+        addToast('AI not configured (no OPENROUTER_API_KEY). Backend returned 503.', 'error');
+      } else {
+        addToast('Turnaround prediction failed: ' + msg, 'error');
+      }
+    }
+    finally { setTurnaroundLoading(false); }
+  };
+
+  const runSkillMatch = async () => {
+    if (!skillCase) { addToast('Please select a case', 'error'); return; }
+    setSkillLoading(true); setSkillResult(null);
+    try {
+      const res = await api('/api/ai/technician-skill-match', { method: 'POST', body: JSON.stringify({ caseId: skillCase }) });
+      setSkillResult(res);
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('openrouter') || msg.includes('503') || msg.toLowerCase().includes('unavailable')) {
+        addToast('AI not configured (no OPENROUTER_API_KEY). Backend returned 503.', 'error');
+      } else {
+        addToast('Skill match failed: ' + msg, 'error');
+      }
+    }
+    finally { setSkillLoading(false); }
   };
 
   return (
@@ -1054,7 +1179,227 @@ function AIToolsPage({ api, addToast }) {
             )}
           </div>
         </div>
+
+        {/* Quality Analytics Dashboard */}
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <i className="fas fa-chart-line"></i>
+            <h3>Quality Analytics (Last 90 Days)</h3>
+          </div>
+          <div className="ai-card-body">
+            <p className="text-muted">Aggregate remakes by technician, material, and restoration type with AI commentary.</p>
+            <button className="btn btn-primary" onClick={runQualityAnalytics} disabled={qaLoading}>
+              {qaLoading ? <><i className="fas fa-spinner fa-spin"></i> Analyzing...</> : <><i className="fas fa-brain"></i> Run Quality Analytics</>}
+            </button>
+            {qaResult && (
+              <div className="ai-result">
+                <div className="ai-result-content">
+                  <div style={{ marginBottom: 8, fontSize: 13 }}>
+                    Total Cases: <b>{qaResult.stats?.total_cases}</b> · Total Remakes: <b>{qaResult.stats?.total_remakes}</b> · Rate: <b>{qaResult.stats?.remake_rate}</b>
+                  </div>
+                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(qaResult.analysis, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Case Kanban */}
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <i className="fas fa-columns"></i>
+            <h3>Case Kanban with AI Estimates</h3>
+          </div>
+          <div className="ai-card-body">
+            <p className="text-muted">Pull current case board grouped by stage with AI completion estimates and bottleneck callouts.</p>
+            <button className="btn btn-primary" onClick={runKanban} disabled={kanbanLoading}>
+              {kanbanLoading ? <><i className="fas fa-spinner fa-spin"></i> Building...</> : <><i className="fas fa-brain"></i> Generate Kanban</>}
+            </button>
+            {kanbanResult && (
+              <div className="ai-result">
+                <div className="ai-result-content">
+                  <div style={{ marginBottom: 8, fontSize: 13 }}>Statuses shown: {(kanbanResult.statuses_shown || []).join(', ')}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginBottom: 8 }}>
+                    {Object.entries(kanbanResult.raw_kanban || {}).map(([status, items]) => (
+                      <div key={status} style={{ background: '#f1f5f9', borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#475569', fontWeight: 600 }}>{status} ({items.length})</div>
+                        {items.slice(0, 5).map(it => (
+                          <div key={it.id} style={{ background: 'white', padding: 6, marginTop: 4, borderRadius: 4, fontSize: 11 }}>
+                            <div style={{ fontWeight: 600 }}>{it.case_number}</div>
+                            <div style={{ color: '#64748b' }}>{it.patient_name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 240 }}>{JSON.stringify(kanbanResult.ai_analysis, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Material Order Advisor */}
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <i className="fas fa-shopping-cart"></i>
+            <h3>Material Order Advisor</h3>
+          </div>
+          <div className="ai-card-body">
+            <p className="text-muted">Prioritized reorder list based on stock levels with AI cost estimates.</p>
+            <button className="btn btn-primary" onClick={runOrderAdvisor} disabled={orderLoading}>
+              {orderLoading ? <><i className="fas fa-spinner fa-spin"></i> Calculating...</> : <><i className="fas fa-brain"></i> Get Reorder Plan</>}
+            </button>
+            {orderResult && (
+              <div className="ai-result">
+                <div className="ai-result-content">
+                  <div style={{ marginBottom: 8, fontSize: 13 }}>
+                    Critical: <b style={{ color: '#dc2626' }}>{orderResult.inventory_summary?.critical}</b> · Urgent: <b style={{ color: '#ea580c' }}>{orderResult.inventory_summary?.urgent}</b> · Needed: <b style={{ color: '#ca8a04' }}>{orderResult.inventory_summary?.needed}</b> · OK: <b style={{ color: '#16a34a' }}>{orderResult.inventory_summary?.ok}</b>
+                  </div>
+                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(orderResult.ai_order_plan, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Predict Turnaround Time */}
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <i className="fas fa-clock"></i>
+            <h3>Predict Turnaround Time</h3>
+          </div>
+          <div className="ai-card-body">
+            <div className="form-group">
+              <label>Select Case</label>
+              <select value={turnaroundCase} onChange={e => setTurnaroundCase(e.target.value)}>
+                <option value="">Select a case...</option>
+                {cases.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.case_number} - {c.patient_name || 'N/A'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={runTurnaround} disabled={turnaroundLoading}>
+              {turnaroundLoading ? <><i className="fas fa-spinner fa-spin"></i> Predicting...</> : <><i className="fas fa-brain"></i> Predict Turnaround</>}
+            </button>
+            {turnaroundResult && (
+              <div className="ai-result">
+                <div className="ai-result-content">
+                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(turnaroundResult.prediction, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Technician Skill Match */}
+        <div className="ai-card">
+          <div className="ai-card-header">
+            <i className="fas fa-user-check"></i>
+            <h3>Technician Skill Match</h3>
+          </div>
+          <div className="ai-card-body">
+            <div className="form-group">
+              <label>Select Case</label>
+              <select value={skillCase} onChange={e => setSkillCase(e.target.value)}>
+                <option value="">Select a case...</option>
+                {cases.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.case_number} - {c.patient_name || 'N/A'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={runSkillMatch} disabled={skillLoading}>
+              {skillLoading ? <><i className="fas fa-spinner fa-spin"></i> Matching...</> : <><i className="fas fa-brain"></i> Match Technician</>}
+            </button>
+            {skillResult && (
+              <div className="ai-result">
+                <div className="ai-result-content">
+                  <div style={{ marginBottom: 8, fontSize: 13 }}>Candidate pool: <b>{skillResult.candidate_count}</b></div>
+                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(skillResult.match, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Notifications Page
+// ============================================================
+function NotificationsPage({ api, addToast }) {
+  const [items, setItems] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [loading, setLoading] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const load = useCallback(async (page = 1) => {
+    setLoading(true);
+    try {
+      const r = await api(`/api/notifications?page=${page}&limit=20${unreadOnly ? '&unread=true' : ''}`);
+      setItems(r.data || []);
+      setPagination(r.pagination || { page, totalPages: 1, total: 0 });
+    } catch (err) { addToast('Failed to load notifications: ' + err.message, 'error'); }
+    finally { setLoading(false); }
+  }, [api, addToast, unreadOnly]);
+
+  useEffect(() => { load(1); }, [load]);
+
+  const markRead = async (id) => {
+    try { await api(`/api/notifications/${id}/read`, { method: 'PUT' }); load(pagination.page); }
+    catch (err) { addToast('Failed: ' + err.message, 'error'); }
+  };
+
+  const markAllRead = async () => {
+    try { await api('/api/notifications/read-all', { method: 'PUT' }); load(pagination.page); addToast('All notifications marked read'); }
+    catch (err) { addToast('Failed: ' + err.message, 'error'); }
+  };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div className="page-header">
+        <h1><i className="fas fa-bell"></i> Notifications</h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} />
+            Unread only
+          </label>
+          <button className="btn btn-secondary" onClick={markAllRead}>Mark all read</button>
+          <button className="btn btn-primary" onClick={() => load(pagination.page)}>Refresh</button>
+        </div>
+      </div>
+      {loading && <div>Loading...</div>}
+      {!loading && items.length === 0 && <div style={{ color: '#64748b' }}>No notifications.</div>}
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {items.map(n => (
+          <li key={n.id} style={{
+            background: n.is_read ? '#f8fafc' : '#fef3c7',
+            border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 8, display: 'flex', justifyContent: 'space-between'
+          }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
+              <div style={{ fontSize: 13, color: '#475569', marginTop: 2 }}>{n.message}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{n.type} · {new Date(n.created_at).toLocaleString()}</div>
+            </div>
+            {!n.is_read && (
+              <button className="btn btn-secondary" onClick={() => markRead(n.id)} style={{ alignSelf: 'flex-start' }}>Mark read</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {pagination.totalPages > 1 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button className="btn btn-secondary" disabled={pagination.page <= 1} onClick={() => load(pagination.page - 1)}>Prev</button>
+          <div style={{ alignSelf: 'center', fontSize: 13 }}>Page {pagination.page} of {pagination.totalPages} · {pagination.total} total</div>
+          <button className="btn btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => load(pagination.page + 1)}>Next</button>
+        </div>
+      )}
     </div>
   );
 }

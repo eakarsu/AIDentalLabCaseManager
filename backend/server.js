@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -10,13 +11,30 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 
 import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
+import aiNewRoutes from './routes/aiNew.js';
+import notificationRoutes from './routes/notifications.js';
 import { createCrudRoutes } from './routes/crud.js';
 import { authenticateToken } from './middleware/auth.js';
+import customViewsRoutes from './routes/customViews.js';
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 4000;
 
-app.use(cors());
+// Security headers
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// CORS from env (comma-separated origins) - falls back to localhost dev
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173')
+  .split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: function (origin, cb) {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS: ' + origin));
+  },
+  credentials: true,
+}));
+
 app.use(express.json({ limit: '10mb' }));
 
 // Public routes
@@ -106,6 +124,18 @@ app.use('/api/design-files', authenticateToken, createCrudRoutes('design_files',
 }));
 
 app.use('/api/ai', authenticateToken, aiRoutes);
+app.use('/api/ai', authenticateToken, aiNewRoutes);
+
+
+
+
+
+app.use('/api/ai', (await import('./routes/supplyOptimize.js')).default);
+app.use('/api/ai', (await import('./routes/qualityScoring.js')).default);
+app.use('/api/ai', (await import('./routes/techSkillMatch.js')).default);
+app.use('/api/ai', (await import('./routes/defectPrevent.js')).default);
+app.use('/api/ai', (await import('./routes/turnaroundPredict.js')).default);
+app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 // Dashboard stats
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
@@ -126,6 +156,29 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// // === Batch 02 Gaps & Frontend Mounts (disabled: CJS require() incompatible with ESM module) ===
+// app.use('/api/gap-none-all-ai-functions-are-covered-highest-ai-density', require('./routes/gap_none_all_ai_functions_are_covered_highest_ai_density'));
+// app.use('/api/gap-no-detailed-case-detail-schema-materials-dentist-contact-pat', require('./routes/gap_no_detailed_case_detail_schema_materials_dentist_contact_pat'));
+// app.use('/api/gap-no-workflow-stage-tracking-received-in-progress-completed-de', require('./routes/gap_no_workflow_stage_tracking_received_in_progress_completed_de'));
+// app.use('/api/gap-no-quality-metric-or-defect-tracker', require('./routes/gap_no_quality_metric_or_defect_tracker'));
+// app.use('/api/gap-no-dentist-customer-communication-template-library', require('./routes/gap_no_dentist_customer_communication_template_library'));
+// app.use('/api/gap-no-inventory-management-for-materials', require('./routes/gap_no_inventory_management_for_materials'));
+// app.use('/api/gap-no-webhooks', require('./routes/gap_no_webhooks'));
+// app.use('/api/gap-no-reporting-beyond-stubs', require('./routes/gap_no_reporting_beyond_stubs'));
+
+// === Custom Views (Lab Views) - mounted BEFORE 404 handler ===
+app.use('/api/custom-views', customViewsRoutes);
+
+// Health endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'dental-lab-api', time: new Date().toISOString() });
+});
+
+// 404 catch-all (after all routes)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not found', path: req.originalUrl });
 });
 
 app.listen(PORT, () => {
