@@ -135,6 +135,7 @@ app.use('/api/ai', (await import('./routes/qualityScoring.js')).default);
 app.use('/api/ai', (await import('./routes/techSkillMatch.js')).default);
 app.use('/api/ai', (await import('./routes/defectPrevent.js')).default);
 app.use('/api/ai', (await import('./routes/turnaroundPredict.js')).default);
+app.use('/api/implant-torque-review', authenticateToken, (await import('./routes/implantTorqueReview.js')).default);
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 // Dashboard stats

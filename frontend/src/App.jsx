@@ -15,6 +15,7 @@ import GapNoInventoryManagementForMaterials from './pages/GapNoInventoryManageme
 import GapNoWebhooks from './pages/GapNoWebhooks';
 import GapNoReportingBeyondStubs from './pages/GapNoReportingBeyondStubs';
 import CustomViewsPage from './pages/CustomViewsPage';
+import ImplantTorqueReview from './pages/ImplantTorqueReview';
 
 // ============================================================
 // DentalLab AI - Case Manager SPA
@@ -252,6 +253,7 @@ const NAV_SECTIONS = [
     title: 'QUALITY & COMPLIANCE',
     items: [
       { key: 'quality-checkpoints', label: 'Quality Control', icon: 'fa-clipboard-check' },
+      { key: 'implant-torque-review', label: 'Implant Torque Review', icon: 'fa-screwdriver' },
       { key: 'remakes', label: 'Remakes/Adjustments', icon: 'fa-redo' },
       { key: 'equipment-calibrations', label: 'Equipment Calibration', icon: 'fa-tools' },
       { key: 'compliance', label: 'OSHA/Compliance', icon: 'fa-shield-alt' },
@@ -363,6 +365,8 @@ function MainContent({ currentPage, setCurrentPage, token, api, addToast, user }
       return <DataPage title="Technicians" apiEndpoint="/api/technicians" columns={TECHNICIANS_COLUMNS} formFields={TECHNICIANS_FIELDS} token={token} api={api} addToast={addToast} />;
     case 'quality-checkpoints':
       return <DataPage title="Quality Checkpoints" apiEndpoint="/api/quality-checkpoints" columns={QUALITY_COLUMNS} formFields={QUALITY_FIELDS} token={token} api={api} addToast={addToast} />;
+    case 'implant-torque-review':
+      return <ImplantTorqueReview api={api} addToast={addToast} />;
     case 'remakes':
       return <DataPage title="Remakes/Adjustments" apiEndpoint="/api/remakes" columns={REMAKES_COLUMNS} formFields={REMAKES_FIELDS} token={token} api={api} addToast={addToast} />;
     case 'equipment-calibrations':
@@ -404,6 +408,7 @@ const FEATURE_CARDS = [
   { key: 'oven-schedules', icon: 'fa-fire', title: 'Oven/Furnace', desc: 'Manage sintering and firing schedules', color: '#ef4444' },
   { key: 'technicians', icon: 'fa-users-cog', title: 'Technicians', desc: 'Staff management and workload tracking', color: '#8b5cf6' },
   { key: 'quality-checkpoints', icon: 'fa-clipboard-check', title: 'Quality Control', desc: 'Inspect and verify production quality', color: '#22c55e' },
+  { key: 'implant-torque-review', icon: 'fa-screwdriver', title: 'Implant Torque Review', desc: 'Verify implant torque values before final release', color: '#0284c7' },
   { key: 'remakes', icon: 'fa-redo', title: 'Remakes/Adjustments', desc: 'Track remakes and root cause analysis', color: '#f97316' },
   { key: 'equipment-calibrations', icon: 'fa-tools', title: 'Equipment Calibration', desc: 'Maintain equipment accuracy and compliance', color: '#71717a' },
   { key: 'compliance', icon: 'fa-shield-alt', title: 'OSHA/Compliance', desc: 'Regulatory compliance and safety records', color: '#dc2626' },
