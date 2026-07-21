@@ -8,6 +8,10 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '.env') });
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters');
+}
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 
 import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
@@ -130,13 +134,14 @@ app.use('/api/ai', authenticateToken, aiNewRoutes);
 
 
 
-app.use('/api/ai', (await import('./routes/supplyOptimize.js')).default);
-app.use('/api/ai', (await import('./routes/qualityScoring.js')).default);
-app.use('/api/ai', (await import('./routes/techSkillMatch.js')).default);
-app.use('/api/ai', (await import('./routes/defectPrevent.js')).default);
-app.use('/api/ai', (await import('./routes/turnaroundPredict.js')).default);
+app.use('/api/ai', authenticateToken, (await import('./routes/supplyOptimize.js')).default);
+app.use('/api/ai', authenticateToken, (await import('./routes/qualityScoring.js')).default);
+app.use('/api/ai', authenticateToken, (await import('./routes/techSkillMatch.js')).default);
+app.use('/api/ai', authenticateToken, (await import('./routes/defectPrevent.js')).default);
+app.use('/api/ai', authenticateToken, (await import('./routes/turnaroundPredict.js')).default);
 app.use('/api/implant-torque-review', authenticateToken, (await import('./routes/implantTorqueReview.js')).default);
 app.use('/api/notifications', authenticateToken, notificationRoutes);
+app.use('/api/governed-workflows', (await import('./routes/governedWorkflow.js')).default);
 
 // Dashboard stats
 app.get('/api/dashboard', authenticateToken, async (req, res) => {

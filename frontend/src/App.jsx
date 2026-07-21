@@ -154,11 +154,6 @@ function LoginPage({ onLogin, addToast }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const autoFill = () => {
-    setEmail('admin@dentallab.com');
-    setPassword('admin123');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -208,9 +203,6 @@ function LoginPage({ onLogin, addToast }) {
               required
             />
           </div>
-          <button type="button" className="btn btn-secondary btn-block" onClick={autoFill}>
-            <i className="fas fa-magic"></i> Auto-fill Credentials
-          </button>
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? <><i className="fas fa-spinner fa-spin"></i> Signing in...</> : 'Sign In'}
           </button>
