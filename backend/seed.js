@@ -12,6 +12,12 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+function requireDemoPassword() {
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
+  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  return password;
+}
+
 async function seed() {
   const client = await pool.connect();
   try {
@@ -354,7 +360,7 @@ async function seed() {
     `);
 
     // Seed Users
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const hashedPassword = await bcrypt.hash(requireDemoPassword(), 10);
     await client.query(`
       INSERT INTO users (email, password, name, role) VALUES
       ('admin@dentallab.com', $1, 'Lab Administrator', 'admin')
