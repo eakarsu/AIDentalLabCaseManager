@@ -19,6 +19,26 @@ for dir in "backend" "frontend"; do
   fi
 done
 
+backend_port="${BACKEND_PORT:-4000}"
+frontend_port="${FRONTEND_PORT:-3000}"
+if lsof -nP -iTCP:"$backend_port" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Backend port $backend_port is already in use." >&2
+  exit 1
+fi
+if lsof -nP -iTCP:"$frontend_port" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Frontend port $frontend_port is already in use." >&2
+  exit 1
+fi
+
+if [[ "${MIGRATE_ON_START:-false}" == "true" ]]; then
+  [[ "${ALLOW_SCHEMA_MIGRATION:-}" == "1" || "${ALLOW_SCHEMA_MIGRATION:-}" == "true" ]] || {
+    echo "MIGRATE_ON_START requires ALLOW_SCHEMA_MIGRATION=1." >&2
+    exit 1
+  }
+  bash "$project_dir/scripts/migrate.sh"
+  node "$project_dir/backend/create-admin.js"
+fi
+
 cleanup() {
   [[ -n "${backend_pid:-}" ]] && kill "$backend_pid" 2>/dev/null || true
   [[ -n "${frontend_pid:-}" ]] && kill "$frontend_pid" 2>/dev/null || true
@@ -30,9 +50,8 @@ npm start &
 backend_pid=$!
 
 cd "$project_dir/frontend"
-npm run dev &
+./node_modules/.bin/vite --host 127.0.0.1 --port "$frontend_port" &
 frontend_pid=$!
 
 echo "Application processes started. Startup does not install, migrate, seed, or terminate unrelated processes."
 wait "$backend_pid" "$frontend_pid"
-
