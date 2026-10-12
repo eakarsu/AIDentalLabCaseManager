@@ -27,10 +27,9 @@ export function createCrudRoutes(tableName, { orderBy = 'id DESC', searchColumns
         // Paginated data query
         let dataQuery;
         if (joinQuery) {
-          // Wrap join query with LIMIT/OFFSET
-          dataQuery = `SELECT * FROM (${joinQuery.replace(/ORDER BY .+$/i, '')}) _sub ORDER BY _sub.id DESC LIMIT $1 OFFSET $2`;
-          // Simpler fallback: append LIMIT/OFFSET directly if joinQuery ends with ORDER BY
-          dataQuery = joinQuery.replace(/ORDER BY (.+)$/i, `ORDER BY $1 LIMIT ${limit} OFFSET ${offset}`);
+          // Keep the join's own ordering; a regex replacement would turn its
+          // ORDER BY expression into the literal parameter placeholder `$1`.
+          dataQuery = `${joinQuery} LIMIT ${limit} OFFSET ${offset}`;
         } else {
           dataQuery = `SELECT ${selectQuery || '*'} FROM ${tableName} ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}`;
         }

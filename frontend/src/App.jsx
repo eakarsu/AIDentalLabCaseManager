@@ -1,3 +1,5 @@
+import AIReportLibrary from "./components/AIReportLibrary";
+import FormattedAIReport from "./components/FormattedAIReport";
 import React, { useState, useEffect, useCallback } from 'react';
 
 // // === Batch 02 Gaps & Frontend Mounts ===
@@ -174,6 +176,20 @@ function LoginPage({ onLogin, addToast }) {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/demo-login', { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Demo login is unavailable.');
+      const data = await res.json();
+      onLogin(data.token, data.user);
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="login-container">
       <div className="login-card">
@@ -205,12 +221,12 @@ function LoginPage({ onLogin, addToast }) {
           </div>
           <button
             type="button"
-            onClick={() => { setEmail(import.meta.env.VITE_DEMO_EMAIL || ''); setPassword(import.meta.env.VITE_DEMO_PASSWORD || ''); }}
-            disabled={!import.meta.env.VITE_DEMO_EMAIL || !import.meta.env.VITE_DEMO_PASSWORD}
-            aria-label="Auto Fill Demo Credentials"
+            onClick={handleDemoLogin}
+            disabled={loading}
+            aria-label="Log In as Demo"
             style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
           >
-            Auto Fill Demo Credentials
+            Log In as Demo
           </button>
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? <><i className="fas fa-spinner fa-spin"></i> Signing in...</> : 'Sign In'}
@@ -335,7 +351,7 @@ function Sidebar({ user, currentPage, setCurrentPage, onLogout, collapsed, toggl
           {!collapsed && <span>Logout</span>}
         </button>
       </div>
-    </aside>
+    <AIReportLibrary /></aside>
   );
 }
 
@@ -531,6 +547,20 @@ function Badge({ value }) {
 // ============================================================
 // Generic DataPage Component
 // ============================================================
+export function recordRows(result) {
+  const rows = Array.isArray(result) ? result : result?.data ?? result?.items;
+  if (!Array.isArray(rows)) throw new Error('The records response did not contain a list.');
+  return rows;
+}
+
+export function RecordTable({ data, columns, onOpen = () => {} }) {
+  return <table className="data-table"><thead><tr>{columns.map(col => <th key={col.key}>{col.label}</th>)}</tr></thead><tbody>
+    {data.map((row, idx) => <tr key={row.id || idx} onClick={() => onOpen(row)} style={{ cursor: 'pointer' }}>
+      {columns.map(col => <td key={col.key}>{col.render ? col.render(row) : ['status', 'priority', 'result', 'skill_level', 'account_status', 'fault_category'].includes(col.key) ? <Badge value={row[col.key]} /> : formatValue(row[col.key], col.key)}</td>)}
+    </tr>)}
+  </tbody></table>;
+}
+
 function DataPage({ title, apiEndpoint, columns, formFields, token, api, addToast }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -546,9 +576,9 @@ function DataPage({ title, apiEndpoint, columns, formFields, token, api, addToas
     setLoading(true);
     api(apiEndpoint)
       .then(result => {
-        setData(Array.isArray(result) ? result : (result.data || result.items || []));
+        setData(recordRows(result));
       })
-      .catch(err => addToast('Failed to load data: ' + err.message, 'error'))
+      .catch(err => { setData([]); addToast('Failed to load data: ' + err.message, 'error'); })
       .finally(() => setLoading(false));
   }, [api, apiEndpoint, addToast]);
 
@@ -640,31 +670,7 @@ function DataPage({ title, apiEndpoint, columns, formFields, token, api, addToas
         </div>
       ) : (
         <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key}>{col.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, idx) => (
-                <tr key={row.id || idx} onClick={() => openDetail(row)} style={{ cursor: 'pointer' }}>
-                  {columns.map(col => (
-                    <td key={col.key}>
-                      {col.render
-                        ? col.render(row)
-                        : ['status', 'priority', 'result', 'skill_level', 'account_status', 'fault_category'].includes(col.key)
-                          ? <Badge value={row[col.key]} />
-                          : formatValue(row[col.key], col.key)
-                      }
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <RecordTable data={data} columns={columns} onOpen={openDetail} />
         </div>
       )}
 
@@ -854,6 +860,30 @@ function renderAIContent(text) {
   return elements;
 }
 
+export function NativeAIPresets({ records, selected, onSelect, kind = 'case', onFill }) {
+  const labels = ['Use available record 1', 'Use available record 2', 'Use available record 3'];
+  return <div className="ai-preset-bar">
+    <div><strong>Fill example</strong><p>Uses an existing {kind} record. Select one first if none is available.</p></div>
+    <div className="ai-actions">{labels.map((label, index) =>
+      <button key={label} type="button" className="btn btn-secondary" onClick={() => {
+        if (!selected && records.length) onSelect(String(records[index % records.length].id));
+        onFill?.(index);
+      }}>{label}</button>)}</div>
+    {!selected && !records.length && <p role="status">An existing {kind} record is required before generation.</p>}
+  </div>;
+}
+
+export function communicationPreset(index) {
+  return {
+    type: ['status_update', 'case_question', 'shade_clarification'][index],
+    context: [
+      'Confirm the crown fabrication stage and expected delivery date with the dentist. Verify the current case notes before sending.',
+      'Ask the dentist to confirm the margin and occlusal clearance before milling. Do not assume missing measurements.',
+      'Request a verified shade reference and approved photos for the anterior restoration before final glazing.'
+    ][index],
+  };
+}
+
 function AIToolsPage({ api, addToast }) {
   const [cases, setCases] = useState([]);
   const [remakes, setRemakes] = useState([]);
@@ -901,8 +931,8 @@ function AIToolsPage({ api, addToast }) {
   const [skillLoading, setSkillLoading] = useState(false);
 
   useEffect(() => {
-    api('/api/cases').then(r => setCases(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
-    api('/api/remakes').then(r => setRemakes(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+    api('/api/cases').then(r => setCases(Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : [])).catch(() => {});
+    api('/api/remakes').then(r => setRemakes(Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : [])).catch(() => {});
   }, [api]);
 
   const runQualityAnalytics = async () => {
@@ -938,7 +968,7 @@ function AIToolsPage({ api, addToast }) {
     setComplexityResult('');
     try {
       const res = await api('/api/ai/complexity-score', { method: 'POST', body: JSON.stringify({ caseId: complexityCase }) });
-      setComplexityResult(res.result || JSON.stringify(res));
+      setComplexityResult(res.result ?? res);
     } catch (err) { addToast('Analysis failed: ' + err.message, 'error'); }
     finally { setComplexityLoading(false); }
   };
@@ -949,7 +979,7 @@ function AIToolsPage({ api, addToast }) {
     setMaterialResult('');
     try {
       const res = await api('/api/ai/material-recommendation', { method: 'POST', body: JSON.stringify({ caseId: materialCase }) });
-      setMaterialResult(res.result || JSON.stringify(res));
+      setMaterialResult(res.result ?? res);
     } catch (err) { addToast('Analysis failed: ' + err.message, 'error'); }
     finally { setMaterialLoading(false); }
   };
@@ -960,7 +990,7 @@ function AIToolsPage({ api, addToast }) {
     setRcaResult('');
     try {
       const res = await api('/api/ai/root-cause-analysis', { method: 'POST', body: JSON.stringify({ remakeId: rcaRemake }) });
-      setRcaResult(res.result || JSON.stringify(res));
+      setRcaResult(res.result ?? res);
     } catch (err) { addToast('Analysis failed: ' + err.message, 'error'); }
     finally { setRcaLoading(false); }
   };
@@ -974,7 +1004,7 @@ function AIToolsPage({ api, addToast }) {
         method: 'POST',
         body: JSON.stringify({ caseId: commCase, communicationType: commType, context: commContext })
       });
-      setCommResult(res.result || JSON.stringify(res));
+      setCommResult(res.result ?? res);
     } catch (err) { addToast('Draft failed: ' + err.message, 'error'); }
     finally { setCommLoading(false); }
   };
@@ -984,7 +1014,7 @@ function AIToolsPage({ api, addToast }) {
     setBottleneckResult('');
     try {
       const res = await api('/api/ai/bottleneck-prediction', { method: 'POST' });
-      setBottleneckResult(res.result || JSON.stringify(res));
+      setBottleneckResult(res.result ?? res);
     } catch (err) { addToast('Analysis failed: ' + err.message, 'error'); }
     finally { setBottleneckLoading(false); }
   };
@@ -1047,13 +1077,14 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={cases} selected={complexityCase} onSelect={setComplexityCase} />
             </div>
             <button className="btn btn-primary" onClick={analyzeComplexity} disabled={complexityLoading}>
               {complexityLoading ? <><i className="fas fa-spinner fa-spin"></i> Analyzing...</> : <><i className="fas fa-brain"></i> Analyze Complexity</>}
             </button>
-            {complexityResult && (
+            {complexityResult !== '' && (
               <div className="ai-result">
-                <div className="ai-result-content">{renderAIContent(complexityResult)}</div>
+                <div className="ai-result-content"><FormattedAIReport response={complexityResult} title="Case complexity" /></div>
               </div>
             )}
           </div>
@@ -1076,13 +1107,14 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={cases} selected={materialCase} onSelect={setMaterialCase} />
             </div>
             <button className="btn btn-primary" onClick={analyzeMaterial} disabled={materialLoading}>
               {materialLoading ? <><i className="fas fa-spinner fa-spin"></i> Analyzing...</> : <><i className="fas fa-brain"></i> Get Recommendation</>}
             </button>
-            {materialResult && (
+            {materialResult !== '' && (
               <div className="ai-result">
-                <div className="ai-result-content">{renderAIContent(materialResult)}</div>
+                <div className="ai-result-content"><FormattedAIReport response={materialResult} title="Material recommendation" /></div>
               </div>
             )}
           </div>
@@ -1105,13 +1137,14 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={remakes} selected={rcaRemake} onSelect={setRcaRemake} kind="remake" />
             </div>
             <button className="btn btn-primary" onClick={analyzeRCA} disabled={rcaLoading}>
               {rcaLoading ? <><i className="fas fa-spinner fa-spin"></i> Analyzing...</> : <><i className="fas fa-brain"></i> Analyze Root Cause</>}
             </button>
-            {rcaResult && (
+            {rcaResult !== '' && (
               <div className="ai-result">
-                <div className="ai-result-content">{renderAIContent(rcaResult)}</div>
+                <div className="ai-result-content"><FormattedAIReport response={rcaResult} title="Root cause analysis" /></div>
               </div>
             )}
           </div>
@@ -1134,6 +1167,11 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={cases} selected={commCase} onSelect={setCommCase} onFill={(index) => {
+                const preset = communicationPreset(index);
+                setCommType(preset.type);
+                setCommContext(preset.context);
+              }} />
             </div>
             <div className="form-group">
               <label>Communication Type</label>
@@ -1159,9 +1197,9 @@ function AIToolsPage({ api, addToast }) {
             <button className="btn btn-primary" onClick={draftCommunication} disabled={commLoading}>
               {commLoading ? <><i className="fas fa-spinner fa-spin"></i> Drafting...</> : <><i className="fas fa-pen-fancy"></i> Draft Communication</>}
             </button>
-            {commResult && (
+            {commResult !== '' && (
               <div className="ai-result">
-                <div className="ai-result-content">{renderAIContent(commResult)}</div>
+                <div className="ai-result-content"><FormattedAIReport response={commResult} title="Dentist communication" /></div>
               </div>
             )}
           </div>
@@ -1178,9 +1216,9 @@ function AIToolsPage({ api, addToast }) {
             <button className="btn btn-primary" onClick={analyzeBottleneck} disabled={bottleneckLoading}>
               {bottleneckLoading ? <><i className="fas fa-spinner fa-spin"></i> Analyzing...</> : <><i className="fas fa-brain"></i> Analyze Bottlenecks</>}
             </button>
-            {bottleneckResult && (
+            {bottleneckResult !== '' && (
               <div className="ai-result">
-                <div className="ai-result-content">{renderAIContent(bottleneckResult)}</div>
+                <div className="ai-result-content"><FormattedAIReport response={bottleneckResult} title="Bottleneck prediction" /></div>
               </div>
             )}
           </div>
@@ -1203,7 +1241,7 @@ function AIToolsPage({ api, addToast }) {
                   <div style={{ marginBottom: 8, fontSize: 13 }}>
                     Total Cases: <b>{qaResult.stats?.total_cases}</b> · Total Remakes: <b>{qaResult.stats?.total_remakes}</b> · Rate: <b>{qaResult.stats?.remake_rate}</b>
                   </div>
-                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(qaResult.analysis, null, 2)}</pre>
+                  <FormattedAIReport response={qaResult.analysis} />
                 </div>
               </div>
             )}
@@ -1238,7 +1276,7 @@ function AIToolsPage({ api, addToast }) {
                       </div>
                     ))}
                   </div>
-                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 240 }}>{JSON.stringify(kanbanResult.ai_analysis, null, 2)}</pre>
+                  <FormattedAIReport response={kanbanResult.ai_analysis} />
                 </div>
               </div>
             )}
@@ -1262,7 +1300,7 @@ function AIToolsPage({ api, addToast }) {
                   <div style={{ marginBottom: 8, fontSize: 13 }}>
                     Critical: <b style={{ color: '#dc2626' }}>{orderResult.inventory_summary?.critical}</b> · Urgent: <b style={{ color: '#ea580c' }}>{orderResult.inventory_summary?.urgent}</b> · Needed: <b style={{ color: '#ca8a04' }}>{orderResult.inventory_summary?.needed}</b> · OK: <b style={{ color: '#16a34a' }}>{orderResult.inventory_summary?.ok}</b>
                   </div>
-                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(orderResult.ai_order_plan, null, 2)}</pre>
+                  <FormattedAIReport response={orderResult.ai_order_plan} />
                 </div>
               </div>
             )}
@@ -1286,6 +1324,7 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={cases} selected={turnaroundCase} onSelect={setTurnaroundCase} />
             </div>
             <button className="btn btn-primary" onClick={runTurnaround} disabled={turnaroundLoading}>
               {turnaroundLoading ? <><i className="fas fa-spinner fa-spin"></i> Predicting...</> : <><i className="fas fa-brain"></i> Predict Turnaround</>}
@@ -1293,7 +1332,7 @@ function AIToolsPage({ api, addToast }) {
             {turnaroundResult && (
               <div className="ai-result">
                 <div className="ai-result-content">
-                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(turnaroundResult.prediction, null, 2)}</pre>
+                  <FormattedAIReport response={turnaroundResult.prediction} />
                 </div>
               </div>
             )}
@@ -1317,6 +1356,7 @@ function AIToolsPage({ api, addToast }) {
                   </option>
                 ))}
               </select>
+              <NativeAIPresets records={cases} selected={skillCase} onSelect={setSkillCase} />
             </div>
             <button className="btn btn-primary" onClick={runSkillMatch} disabled={skillLoading}>
               {skillLoading ? <><i className="fas fa-spinner fa-spin"></i> Matching...</> : <><i className="fas fa-brain"></i> Match Technician</>}
@@ -1325,7 +1365,7 @@ function AIToolsPage({ api, addToast }) {
               <div className="ai-result">
                 <div className="ai-result-content">
                   <div style={{ marginBottom: 8, fontSize: 13 }}>Candidate pool: <b>{skillResult.candidate_count}</b></div>
-                  <pre style={{ fontSize: 11, background: '#0f172a', color: '#e2e8f0', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 320 }}>{JSON.stringify(skillResult.match, null, 2)}</pre>
+                  <FormattedAIReport response={skillResult.match} />
                 </div>
               </div>
             )}
@@ -1349,7 +1389,7 @@ function NotificationsPage({ api, addToast }) {
     setLoading(true);
     try {
       const r = await api(`/api/notifications?page=${page}&limit=20${unreadOnly ? '&unread=true' : ''}`);
-      setItems(r.data || []);
+      setItems(Array.isArray(r?.data) ? r.data : []);
       setPagination(r.pagination || { page, totalPages: 1, total: 0 });
     } catch (err) { addToast('Failed to load notifications: ' + err.message, 'error'); }
     finally { setLoading(false); }

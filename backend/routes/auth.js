@@ -22,6 +22,26 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Local development convenience. Credentials stay on the server and the existing
+// account is authenticated through the same password check as a normal login.
+router.post('/demo-login', async (req, res) => {
+  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+  if (process.env.NODE_ENV === 'production' || !local || !process.env.DEMO_EMAIL || !process.env.DEMO_PASSWORD) {
+    return res.status(404).json({ error: 'Demo login is unavailable.' });
+  }
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [process.env.DEMO_EMAIL]);
+    const user = result.rows[0];
+    if (!user || !await bcrypt.compare(process.env.DEMO_PASSWORD, user.password)) {
+      return res.status(401).json({ error: 'Configured demo account is unavailable.' });
+    }
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id }, process.env.JWT_SECRET, { expiresIn: '12h' });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, tenant_id: user.tenant_id } });
+  } catch (_) {
+    res.status(500).json({ error: 'Demo login failed.' });
+  }
+});
+
 router.get('/me', async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
