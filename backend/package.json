@@ -6,7 +6,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed.js",
-    "test:policy": "node --test tests/governedWorkflow.test.js"
+    "test:policy": "node --test tests/governedWorkflow.test.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

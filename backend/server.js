@@ -25,6 +25,7 @@ import notificationRoutes from './routes/notifications.js';
 import { createCrudRoutes } from './routes/crud.js';
 import { authenticateToken } from './middleware/auth.js';
 import customViewsRoutes from './routes/customViews.js';
+import { createFeaturePackRouter } from './routes/featurePack.js';
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 4000;
@@ -181,6 +182,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 
 // === Custom Views (Lab Views) - mounted BEFORE 404 handler ===
 app.use('/api/custom-views', customViewsRoutes);
+app.use('/api/feature-pack', createFeaturePackRouter());
 
 // Health endpoint
 app.get('/api/health', (req, res) => {
